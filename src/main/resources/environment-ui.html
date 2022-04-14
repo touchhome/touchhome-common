@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>Environment parameters</title>
+    <base href="/"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <style> table.example-table, .example-table td {
+        border: 1px solid #0d6c90;
+        border-collapse: collapse;
+        max-width: 1200px;
+    } </style>
+    <script type="application/javascript">
+        function docReady(fn) {
+            // see if DOM is already available
+            if (document.readyState === "complete" || document.readyState === "interactive") {
+                // call on next available tick
+                setTimeout(fn, 1);
+            } else {
+                document.addEventListener("DOMContentLoaded", fn);
+            }
+        }
+
+        docReady(function () {
+            const table = document.getElementById('table');
+
+            if (!document.location.pathname.endsWith('/environment-ui.html')) {
+                alert("Unable to load environment-ui page. 'document.location.pathname' must ends with '/environment-ui.html'");
+                return;
+            }
+            let base = document.location.pathname.substr(0, document.location.pathname.length - '-ui.html'.length);
+
+            fetch(base).then(function (response) {
+                response.text().then(function (text) {
+                    const data = JSON.parse(text);
+                    //Add the data rows.
+                    for (const item of data) {
+                        let row = table.insertRow(-1);
+                        row.id = item.id;
+                        row.insertCell(-1).innerHTML = item.id;
+                        const valTD = row.insertCell(-1);
+                        valTD.innerHTML = item.value;
+                        valTD.style.whiteSpace = 'nowrap';
+                        valTD.style.maxWidth = '1000px';
+                        valTD.style.overflow = 'auto';
+                        row.insertCell(-1).innerHTML = item.type;
+                        row.insertCell(-1).innerHTML = item.description;
+                        row.insertCell(-1).innerHTML = '';
+                    }
+
+                    fetch(`${base}/updatable`).then(function (response) {
+                        response.text().then(function (text) {
+                            const updates = JSON.parse(text);
+                            //Add the data rows.
+                            for (let i = 0; i < updates.length; i++) {
+                                const env = updates[i];
+                                const idRow = document.getElementById(env.id);
+                                if (idRow) {
+                                    const btn = document.createElement('button');
+                                    btn.innerHTML = "Update value";
+                                    btn.onclick = function () {
+                                        const result = prompt(`Set new value for property <${env.id}>`, env.value);
+                                        if (result && result != env.value) {
+                                            fetch(`${base}/${env.id}`, {
+                                                method: 'PUT',
+                                                body: result
+                                            }).then(function (response) {
+                                                if (response.status === 200) {
+                                                    window.location.reload();
+                                                } else {
+                                                    response.text().then(value => {
+                                                        alert(value);
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    };
+                                    const item = data.find(d => d.id === env.id);
+                                    if (item.value !== item.initValue) {
+                                        idRow.cells[1].innerHTML = `<div style="white-space: nowrap; color: #18B11D">Current: ${item.value}</div>
+                                                                    <div style="color: #7E8081;"><span style="margin-right: 15px;">Initial:</span>${item.initValue}</div>`;
+                                    }
+                                    if (item.errorValue) {
+                                        idRow.cells[1].innerHTML = `<div style="white-space: nowrap; color: #18B11D">Current: ${item.value}</div>
+                                                                    <div style="color: #F93B02;"><span style="margin-right: 18px;">Error:</span>${item.errorValue}</div>`;
+                                    }
+                                    if (item.convertedValue) {
+                                        idRow.cells[1].innerHTML += `<pre style="color: #0D6C90;"><div style="margin-right: 15px;">Converted:</div>${JSON.stringify(item.convertedValue, null, 4)}</pre>`;
+                                    }
+                                    idRow.cells[4].appendChild(btn);
+                                }
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+<table id="table" style="border-width: 2px;" class="example-table">
+    <caption style="font-weight: bold; color: #00adff;">Environment variables</caption>
+    <tr style="color: #0d6c90;background: #fff8ed;">
+        <th>Name</th>
+        <th>Value</th>
+        <th>Type</th>
+        <th style="min-width: 300px;">Description</th>
+        <th>Set new value</th>
+    </tr>
+</table>
+</body>
+</html>
